@@ -12,148 +12,17 @@ output:
 
 ```r
 library(tidyverse)
-```
-
-```
-## -- Attaching packages ------------- tidyverse 1.3.0 --
-```
-
-```
-## <U+2713> ggplot2 3.2.1     <U+2713> purrr   0.3.3
-## <U+2713> tibble  2.1.3     <U+2713> dplyr   0.8.3
-## <U+2713> tidyr   1.0.0     <U+2713> stringr 1.4.0
-## <U+2713> readr   1.3.1     <U+2713> forcats 0.4.0
-```
-
-```
-## Warning: package 'stringr' was built under R version 3.6.2
-```
-
-```
-## -- Conflicts ---------------- tidyverse_conflicts() --
-## x dplyr::filter() masks stats::filter()
-## x dplyr::lag()    masks stats::lag()
-```
-
-```r
 library(skimr)
-```
-
-```
-## Warning: package 'skimr' was built under R version 3.6.2
-```
-
-```r
 library(GGally)
-```
-
-```
-## Warning: package 'GGally' was built under R version 3.6.2
-```
-
-```
-## Registered S3 method overwritten by 'GGally':
-##   method from   
-##   +.gg   ggplot2
-```
-
-```
-## 
-## Attaching package: 'GGally'
-```
-
-```
-## The following object is masked from 'package:dplyr':
-## 
-##     nasa
-```
-
-```r
 library(corrr)
-```
-
-```
-## Warning: package 'corrr' was built under R version 3.6.2
-```
-
-```
-## 
-## Attaching package: 'corrr'
-```
-
-```
-## The following object is masked from 'package:skimr':
-## 
-##     focus
-```
-
-```r
 library(corrplot)
-```
-
-```
-## Warning: package 'corrplot' was built under R version 3.6.2
-```
-
-```
-## corrplot 0.84 loaded
-```
-
-```r
 library(ggridges)
-```
-
-```
-## Warning: package 'ggridges' was built under R version 3.6.2
-```
-
-```r
 library(viridis)
-```
-
-```
-## Warning: package 'viridis' was built under R version 3.6.2
-```
-
-```
-## Loading required package: viridisLite
-```
-
-```r
 library(hrbrthemes)
-```
-
-```
-## Warning: package 'hrbrthemes' was built under R version 3.6.2
-```
-
-```r
 library(ggpubr)
-```
-
-```
-## Warning: package 'ggpubr' was built under R version 3.6.2
-```
-
-```
-## Loading required package: magrittr
-```
-
-```
-## 
-## Attaching package: 'magrittr'
-```
-
-```
-## The following object is masked from 'package:purrr':
-## 
-##     set_names
-```
-
-```
-## The following object is masked from 'package:tidyr':
-## 
-##     extract
+library(moderndive)
+library(olsrr)
+library(MASS)
 ```
 
 
@@ -161,26 +30,9 @@ library(ggpubr)
 diamonds <- read_csv("diamonds.csv")
 ```
 
-```
-## Warning: Missing column names filled in: 'X1' [1]
-```
-
-```
-## Parsed with column specification:
-## cols(
-##   X1 = col_double(),
-##   carat = col_double(),
-##   cut = col_character(),
-##   color = col_character(),
-##   clarity = col_character(),
-##   depth = col_double(),
-##   table = col_double(),
-##   price = col_double(),
-##   x = col_double(),
-##   y = col_double(),
-##   z = col_double()
-## )
-```
+X : Length of the Diamond in mm.
+Y : Width of the Diamond in mm.
+Z : Height of the Diamond in mm.
 
 
 ```r
@@ -292,9 +144,15 @@ diamonds <- diamonds[,-1] %>%
   filter(x != 0 | y != 0 | z != 0)
 ```
 
+Create a new variable.
 
 ```r
-smp_siz = floor(0.75*nrow(diamonds))
+diamonds$volume <- diamonds$x * diamonds$y * diamonds$z
+```
+
+
+```r
+smp_siz = floor(0.80*nrow(diamonds))
 set.seed(123)
 train_ind = sample(seq_len(nrow(diamonds)), size = smp_siz)
 train = diamonds[train_ind,]
@@ -303,10 +161,10 @@ test = diamonds[-train_ind,]
 
 
 ```r
-ggpairs(train)
+ggpairs(train[4000:6000,])
 ```
 
-![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
 
 ```r
@@ -315,22 +173,24 @@ cor_mat
 ```
 
 ```
-##            carat       depth      table       price           x           y
-## carat 1.00000000  0.02588568  0.1799803  0.92228988  0.97796525  0.94711337
-## depth 0.02588568  1.00000000 -0.2994862 -0.01009593 -0.02790671 -0.03177679
-## table 0.17998026 -0.29948624  1.0000000  0.12546385  0.19570744  0.18239366
-## price 0.92228988 -0.01009593  0.1254638  1.00000000  0.88749432  0.86154848
-## x     0.97796525 -0.02790671  0.1957074  0.88749432  1.00000000  0.96755156
-## y     0.94711337 -0.03177679  0.1823937  0.86154848  0.96755156  1.00000000
-## z     0.97084400  0.09458694  0.1541549  0.87742186  0.98578908  0.96118659
-##                z
-## carat 0.97084400
-## depth 0.09458694
-## table 0.15415486
-## price 0.87742186
-## x     0.98578908
-## y     0.96118659
-## z     1.00000000
+##             carat        depth      table       price           x           y
+## carat  1.00000000  0.025885470  0.1821634  0.92179780  0.97758001  0.94856258
+## depth  0.02588547  1.000000000 -0.2995327 -0.01068854 -0.02775043 -0.03143387
+## table  0.18216342 -0.299532689  1.0000000  0.12707642  0.19752901  0.18461968
+## price  0.92179780 -0.010688543  0.1270764  1.00000000  0.88760093  0.86335956
+## x      0.97758001 -0.027750426  0.1975290  0.88760093  1.00000000  0.96947100
+## y      0.94856258 -0.031433869  0.1846197  0.86335956  0.96947100  1.00000000
+## z      0.97060583  0.094711472  0.1561591  0.87764439  0.98579920  0.96268263
+## volume 0.97296815  0.006735367  0.1680092  0.89939572  0.95336424  0.97632579
+##                 z      volume
+## carat  0.97060583 0.972968147
+## depth  0.09471147 0.006735367
+## table  0.15615910 0.168009151
+## price  0.87764439 0.899395724
+## x      0.98579920 0.953364243
+## y      0.96268263 0.976325793
+## z      1.00000000 0.955497345
+## volume 0.95549735 1.000000000
 ```
 
 
@@ -338,7 +198,35 @@ cor_mat
 corrplot(cor_mat, method="pie", type="lower", addCoef.col = "black")
 ```
 
-![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+
+
+```r
+plot1 <- diamonds %>%
+  ggplot(aes(x = x, y = price)) + 
+  geom_point()
+plot2 <- diamonds %>%
+  ggplot(aes(x = y, y = price)) + 
+  geom_point()
+
+plot3 <- diamonds %>%
+  ggplot(aes(x = z, y = price)) + 
+  geom_point()
+plot4 <- diamonds %>%
+  ggplot(aes(x = carat, y = price)) + 
+  geom_point()
+
+plot5 <- diamonds %>%
+  ggplot(aes(x = table, y = price)) +
+  geom_point()
+plot6 <- diamonds %>%
+  ggplot(aes(x = depth, y = price)) + 
+  geom_point()
+
+ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 3, nrow = 3)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
 
 
 ```r
@@ -349,8 +237,351 @@ plot1 <- train %>%
 plot2 <- train %>%
   ggplot((aes(x = cut, y = price))) +
   geom_boxplot()
-ggarrange(plot1, plot2)
+
+plot3 <- train %>%
+  ggplot((aes(x = price, y = color, fill = ..x..))) + 
+  geom_density_ridges_gradient(scale = 2, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "A", direction = -1)
+plot4 <- train %>%
+  ggplot((aes(x = color, y = price))) +
+  geom_boxplot()
+
+plot5 <- train %>%
+  ggplot((aes(x = price, y = clarity, fill = ..x..))) + 
+  geom_density_ridges_gradient(scale = 2, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "A", direction = -1)
+plot6 <- train %>%
+  ggplot((aes(x = clarity, y = price))) +
+  geom_boxplot()
+
+ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 2, nrow = 3)
 ```
 
-![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
 
+
+```r
+model_single <- lm(price ~ carat, data = train)
+get_regression_summaries(model_single)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1      0.85          0.85 2398614. 1549. 1549.   243930.       0     2
+```
+
+
+```r
+model_full <- lm(price ~ ., data = train)
+get_regression_summaries(model_full)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1      0.92          0.92 1279080. 1131. 1131.    20622.       0    25
+```
+
+
+```r
+model_bw <- step(model_full, direction = "backward", trace = FALSE)
+model_fw <- step(model_single, scope = list(lower = model_single, upper = model_full), direction = "forward", trace = FALSE)
+model_bo <- step(model_single, scope = list(lower = model_single, upper = model_full), direction = "both", trace = FALSE)
+```
+
+
+```
+## [1] "Step Backward:  price ~ carat + cut + color + clarity + depth + table + x + y + z + volume"
+```
+
+```
+## [1] "Step Forward:  price ~ carat + clarity + color + x + cut + depth + table + volume + y + z"
+```
+
+```
+## [1] "Step Both:  price ~ carat + clarity + color + x + cut + depth + table + volume + y + z"
+```
+
+
+```r
+get_regression_summaries(model_bw)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1      0.92          0.92 1279080. 1131. 1131.    20622.       0    25
+```
+
+```r
+get_regression_summaries(model_fw)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1      0.92          0.92 1279080. 1131. 1131.    20622.       0    25
+```
+
+```r
+get_regression_summaries(model_bo)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1      0.92          0.92 1279080. 1131. 1131.    20622.       0    25
+```
+
+
+```r
+car::vif(model_bo)
+```
+
+```
+##               GVIF Df GVIF^(1/(2*Df))
+## carat   146.152118  1       12.089339
+## clarity   1.349371  7        1.021633
+## color     1.180666  6        1.013936
+## x       282.818667  1       16.817213
+## cut       2.045555  4        1.093582
+## depth     3.218360  1        1.793979
+## table     1.807284  1        1.344353
+## volume  143.022783  1       11.959213
+## y       111.193483  1       10.544832
+## z       104.563663  1       10.225638
+```
+
+
+```r
+model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table + z, data = train)
+car::vif(model_bo_vif)
+```
+
+```
+##              GVIF Df GVIF^(1/(2*Df))
+## carat   19.411236  1        4.405818
+## cut      1.920970  4        1.085026
+## color    1.176628  6        1.013647
+## clarity  1.333244  7        1.020756
+## depth    1.457653  1        1.207333
+## table    1.788128  1        1.337209
+## z       19.455282  1        4.410814
+```
+
+
+```r
+model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table, data = train)
+car::vif(model_bo_vif)
+```
+
+```
+##             GVIF Df GVIF^(1/(2*Df))
+## carat   1.320765  1        1.149245
+## cut     1.917285  4        1.084765
+## color   1.168465  6        1.013059
+## clarity 1.300861  7        1.018965
+## depth   1.374470  1        1.172378
+## table   1.788047  1        1.337179
+```
+
+
+```r
+get_regression_summaries(model_bo_vif)
+```
+
+```
+## # A tibble: 1 x 8
+##   r_squared adj_r_squared      mse  rmse sigma statistic p_value    df
+##       <dbl>         <dbl>    <dbl> <dbl> <dbl>     <dbl>   <dbl> <dbl>
+## 1     0.916         0.916 1343160. 1159. 1159.    23465.       0    21
+```
+
+Testing the Normality Assumption
+
+```r
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs),length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+
+```r
+ks.test(studres(model_bo_vif), dnorm(xfit))
+```
+
+```
+## Warning in ks.test(studres(model_bo_vif), dnorm(xfit)): p-value will be
+## approximate in the presence of ties
+```
+
+```
+## 
+## 	Two-sample Kolmogorov-Smirnov test
+## 
+## data:  studres(model_bo_vif) and dnorm(xfit)
+## D = 0.58251, p-value = 3.333e-12
+## alternative hypothesis: two-sided
+```
+
+
+```r
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-28-1.png)<!-- -->
+
+## Log Transformation
+
+
+```r
+train$caratlog <- log(train$carat)
+train$pricelog <- log(train$price)
+train$depthlog <- log(train$depth)
+train$tablelog <- log(train$table)
+train$volumelog <- log(train$volume + 0.000001)
+```
+
+
+
+```r
+model_full <- lm(pricelog ~ cut + color + clarity + caratlog + depthlog + tablelog + volumelog, data=train)
+model_bw <- step(model_full, direction = "backward", trace = FALSE)
+```
+
+
+```r
+model_bo_vif <- model_bw
+```
+
+
+```r
+car::vif(model_bo_vif)
+```
+
+```
+##               GVIF Df GVIF^(1/(2*Df))
+## cut       1.107703  4        1.012868
+## color     1.139738  6        1.010960
+## clarity   1.319876  7        1.020022
+## caratlog  5.499759  1        2.345157
+## volumelog 5.149635  1        2.269281
+```
+
+Testing the Normality Assumption
+
+```r
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs),length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+
+
+```r
+ks.test(studres(model_bo_vif), dnorm(xfit)) 
+```
+
+```
+## Warning in ks.test(studres(model_bo_vif), dnorm(xfit)): p-value will be
+## approximate in the presence of ties
+```
+
+```
+## 
+## 	Two-sample Kolmogorov-Smirnov test
+## 
+## data:  studres(model_bo_vif) and dnorm(xfit)
+## D = 0.50081, p-value = 3.936e-09
+## alternative hypothesis: two-sided
+```
+
+
+```r
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+
+## Removing Outlier
+
+
+```r
+#box <- boxplot(train$pricelog)
+```
+
+
+```r
+plot <- ols_plot_cooksd_chart(model_bo_vif)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+
+
+```r
+data_plot <- plot$data
+index_outlier <- data_plot[data_plot$color == "outlier",]$obs
+train_outlier <- train[index_outlier,]
+train_clean <- train[-index_outlier,]
+```
+
+Testing the Normality Assumption
+
+```r
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs), length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-39-1.png)<!-- -->
+
+
+
+```r
+ks.test(studres(model_bo_vif), dnorm(xfit)) 
+```
+
+```
+## Warning in ks.test(studres(model_bo_vif), dnorm(xfit)): p-value will be
+## approximate in the presence of ties
+```
+
+```
+## 
+## 	Two-sample Kolmogorov-Smirnov test
+## 
+## data:  studres(model_bo_vif) and dnorm(xfit)
+## D = 0.50081, p-value = 3.936e-09
+## alternative hypothesis: two-sided
+```
+
+
+```r
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
+
+![](Diamonds-Price-LBB-Regression-Analysis_files/figure-html/unnamed-chunk-41-1.png)<!-- -->

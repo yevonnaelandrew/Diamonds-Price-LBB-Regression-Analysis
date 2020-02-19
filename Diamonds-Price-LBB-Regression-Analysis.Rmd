@@ -1,0 +1,288 @@
+---
+title: "Diamonds Price - LBB Regression Analysis"
+author: "Yevonnael Andrew"
+date: "2/18/2020"
+output: 
+  html_document:
+    keep_md: true
+  md_document:
+    variant: markdown_github
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(skimr)
+library(GGally)
+library(corrr)
+library(corrplot)
+library(ggridges)
+library(viridis)
+library(hrbrthemes)
+library(ggpubr)
+library(moderndive)
+library(olsrr)
+library(MASS)
+```
+
+```{r, message=FALSE, warning=FALSE}
+diamonds <- read_csv("diamonds.csv")
+```
+
+X : Length of the Diamond in mm.
+Y : Width of the Diamond in mm.
+Z : Height of the Diamond in mm.
+
+```{r}
+glimpse(diamonds)
+```
+
+```{r}
+diamonds$cut <- as.factor(diamonds$cut)
+diamonds$color <- as.factor(diamonds$color)
+diamonds$clarity <- as.factor(diamonds$clarity)
+```
+
+```{r}
+skim(diamonds)
+```
+
+```{r}
+diamonds[, c(1, 9:11)] %>%
+  filter(x == 0 | y == 0 | z == 0)
+```
+
+```{r}
+diamonds <- diamonds[,-1] %>%
+  filter(x != 0 | y != 0 | z != 0)
+```
+
+Create a new variable.
+```{r}
+diamonds$volume <- diamonds$x * diamonds$y * diamonds$z
+```
+
+```{r}
+smp_siz = floor(0.80*nrow(diamonds))
+set.seed(123)
+train_ind = sample(seq_len(nrow(diamonds)), size = smp_siz)
+train = diamonds[train_ind,]
+test = diamonds[-train_ind,] 
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width=12, cache=TRUE}
+ggpairs(train[4000:6000,])
+```
+
+```{r}
+cor_mat <- cor(train[, -c(2:4)])
+cor_mat
+```
+
+```{r}
+corrplot(cor_mat, method="pie", type="lower", addCoef.col = "black")
+```
+
+```{r, fig.width=10, fig.height=10}
+plot1 <- diamonds %>%
+  ggplot(aes(x = x, y = price)) + 
+  geom_point()
+plot2 <- diamonds %>%
+  ggplot(aes(x = y, y = price)) + 
+  geom_point()
+
+plot3 <- diamonds %>%
+  ggplot(aes(x = z, y = price)) + 
+  geom_point()
+plot4 <- diamonds %>%
+  ggplot(aes(x = carat, y = price)) + 
+  geom_point()
+
+plot5 <- diamonds %>%
+  ggplot(aes(x = table, y = price)) +
+  geom_point()
+plot6 <- diamonds %>%
+  ggplot(aes(x = depth, y = price)) + 
+  geom_point()
+
+ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 3, nrow = 3)
+```
+
+```{r, message=FALSE, waning=FALSE, fig.width=10, fig.height=10}
+plot1 <- train %>%
+  ggplot((aes(x = price, y = cut, fill = ..x..))) + 
+  geom_density_ridges_gradient(scale = 2, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "A", direction = -1)
+plot2 <- train %>%
+  ggplot((aes(x = cut, y = price))) +
+  geom_boxplot()
+
+plot3 <- train %>%
+  ggplot((aes(x = price, y = color, fill = ..x..))) + 
+  geom_density_ridges_gradient(scale = 2, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "A", direction = -1)
+plot4 <- train %>%
+  ggplot((aes(x = color, y = price))) +
+  geom_boxplot()
+
+plot5 <- train %>%
+  ggplot((aes(x = price, y = clarity, fill = ..x..))) + 
+  geom_density_ridges_gradient(scale = 2, rel_min_height = 0.01) +
+  scale_fill_viridis(option = "A", direction = -1)
+plot6 <- train %>%
+  ggplot((aes(x = clarity, y = price))) +
+  geom_boxplot()
+
+ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 2, nrow = 3)
+```
+
+```{r}
+model_single <- lm(price ~ carat, data = train)
+get_regression_summaries(model_single)
+```
+
+```{r}
+model_full <- lm(price ~ ., data = train)
+get_regression_summaries(model_full)
+```
+
+```{r}
+model_bw <- step(model_full, direction = "backward", trace = FALSE)
+model_fw <- step(model_single, scope = list(lower = model_single, upper = model_full), direction = "forward", trace = FALSE)
+model_bo <- step(model_single, scope = list(lower = model_single, upper = model_full), direction = "both", trace = FALSE)
+```
+
+```{r, echo=FALSE}
+paste("Step Backward: ", model_bw$call[[2]])
+paste("Step Forward: ", model_fw$call[[2]])
+paste("Step Both: ", model_bo$call[[2]])
+```
+
+```{r}
+get_regression_summaries(model_bw)
+```
+```{r}
+get_regression_summaries(model_fw)
+```
+```{r}
+get_regression_summaries(model_bo)
+```
+
+```{r}
+car::vif(model_bo)
+```
+
+```{r}
+model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table + z, data = train)
+car::vif(model_bo_vif)
+```
+
+```{r}
+model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table, data = train)
+car::vif(model_bo_vif)
+```
+
+```{r}
+get_regression_summaries(model_bo_vif)
+```
+
+Testing the Normality Assumption
+```{r, fig.width=8}
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs),length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+```{r}
+ks.test(studres(model_bo_vif), dnorm(xfit))
+```
+
+```{r, fig.width=10}
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
+
+## Log Transformation
+
+```{r}
+train$caratlog <- log(train$carat)
+train$pricelog <- log(train$price)
+train$depthlog <- log(train$depth)
+train$tablelog <- log(train$table)
+train$volumelog <- log(train$volume + 0.000001)
+```
+
+
+```{r}
+model_full <- lm(pricelog ~ cut + color + clarity + caratlog + depthlog + tablelog + volumelog, data=train)
+model_bw <- step(model_full, direction = "backward", trace = FALSE)
+```
+
+```{r}
+model_bo_vif <- model_bw
+```
+
+```{r}
+car::vif(model_bo_vif)
+```
+
+Testing the Normality Assumption
+```{r, fig.width=8}
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs),length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+```{r}
+ks.test(studres(model_bo_vif), dnorm(xfit)) 
+```
+
+```{r, fig.width=10}
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
+
+## Removing Outlier
+
+```{r}
+#box <- boxplot(train$pricelog)
+```
+
+```{r, fig.width=10}
+plot <- ols_plot_cooksd_chart(model_bo_vif)
+```
+
+```{r}
+data_plot <- plot$data
+index_outlier <- data_plot[data_plot$color == "outlier",]$obs
+train_outlier <- train[index_outlier,]
+train_clean <- train[-index_outlier,]
+```
+
+Testing the Normality Assumption
+```{r, fig.width=8}
+srs <- studres(model_bo_vif)
+hist(srs, freq=FALSE, 
+     main="Distribution of Studentized Residuals",
+     breaks=100)
+xfit<-seq(min(srs),max(srs), length=40) 
+yfit<-dnorm(xfit) 
+lines(xfit, yfit)
+```
+
+
+```{r} 
+ks.test(studres(model_bo_vif), dnorm(xfit)) 
+```
+
+```{r, fig.width=10}
+par(mfrow = c(2,2))
+plot(model_bo_vif)
+```
