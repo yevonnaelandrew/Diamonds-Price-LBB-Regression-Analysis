@@ -56,11 +56,6 @@ diamonds <- diamonds[,-1] %>%
   filter(x != 0 | y != 0 | z != 0)
 ```
 
-Create a new variable.
-```{r}
-diamonds$volume <- diamonds$x * diamonds$y * diamonds$z
-```
-
 ```{r}
 smp_siz = floor(0.80*nrow(diamonds))
 set.seed(123)
@@ -205,33 +200,67 @@ par(mfrow = c(2,2))
 plot(model_bo_vif)
 ```
 
-## Log Transformation
+## Normalization using bestNormalize()
+
+Reference:
+https://cran.r-project.org/web/packages/bestNormalize/vignettes/bestNormalize.html
 
 ```{r}
-train$caratlog <- log(train$carat)
-train$pricelog <- log(train$price)
-train$depthlog <- log(train$depth)
-train$tablelog <- log(train$table)
-train$volumelog <- log(train$volume + 0.000001)
-```
-
-
-```{r}
-model_full <- lm(pricelog ~ cut + color + clarity + caratlog + depthlog + tablelog + volumelog, data=train)
-model_bw <- step(model_full, direction = "backward", trace = FALSE)
+library(bestNormalize)
 ```
 
 ```{r}
-model_bo_vif <- model_bw
+par(mfrow=c(2, 4))
+hist(train$carat)
+hist(train$depth)
+hist(train$table)
+hist(train$price)
+hist(train$x)
+hist(train$y)
+hist(train$z)
 ```
 
 ```{r}
-car::vif(model_bo_vif)
+train$caratBN <- orderNorm(train$carat)$x.t
+train$depthBN <- orderNorm(train$depth)$x.t
+train$tableBN <- orderNorm(train$table)$x.t
+train$priceBN <- orderNorm(train$price)$x.t
+train$xBN <- orderNorm(train$x)$x.t
+train$yBN <- orderNorm(train$y)$x.t
+train$zBN <- orderNorm(train$z)$x.t
+```
+
+```{r}
+par(mfrow=c(2, 4))
+hist(train$caratBN)
+hist(train$depthBN)
+hist(train$tableBN)
+hist(train$priceBN)
+hist(train$xBN)
+hist(train$yBN)
+hist(train$zBN)
+```
+
+```{r}
+model_BN_full <- lm(priceBN ~ caratBN + depthBN + tableBN + xBN + yBN + zBN + cut + clarity + color, data = train)
+summary(model_BN_full)
+```
+
+-----
+
+
+```{r}
+model_BN_none <- lm(priceBN ~ 1, data = train)
+model_BN_bo <- step(model_BN_none, scope = list(lower = model_BN_none, upper = model_BN_full), direction = "both", trace = FALSE)
+```
+
+```{r}
+summary(model_BN_bo)
 ```
 
 Testing the Normality Assumption
 ```{r, fig.width=8}
-srs <- studres(model_bo_vif)
+srs <- studres(model_BN_bo)
 hist(srs, freq=FALSE, 
      main="Distribution of Studentized Residuals",
      breaks=100)
@@ -241,48 +270,68 @@ lines(xfit, yfit)
 ```
 
 ```{r}
-ks.test(studres(model_bo_vif), dnorm(xfit)) 
+library(lmtest)
+bptest(model_BN_bo)
 ```
 
-```{r, fig.width=10}
-par(mfrow = c(2,2))
-plot(model_bo_vif)
-```
-
-## Removing Outlier
 
 ```{r}
-#box <- boxplot(train$pricelog)
-```
-
-```{r, fig.width=10}
-plot <- ols_plot_cooksd_chart(model_bo_vif)
+ks.test(studres(model_BN_bo), dnorm(xfit))
 ```
 
 ```{r}
-data_plot <- plot$data
-index_outlier <- data_plot[data_plot$color == "outlier",]$obs
-train_outlier <- train[index_outlier,]
-train_clean <- train[-index_outlier,]
+hist(train$priceBN, breaks=1000)
 ```
+
+
+## Outliers
+
+```{r}
+library(olsrr)
+```
+
+```{r}
+cooksdplot <- ols_plot_cooksd_bar(model_BN_bo)
+```
+
+```{r}
+data_cooksdplot <- cooksdplot$data
+ind_outlier <- data_cooksdplot$color == "outlier"
+train_clean <- train[ind_outlier == FALSE,]
+train_outlier <- train[ind_outlier == TRUE,]
+```
+
+```{r}
+model_BN_bo_clean <- lm(formula = priceBN ~ xBN + clarity + color + depthBN + zBN + 
+    yBN + cut + tableBN + caratBN, data = train_clean)
+```
+
+```{r}
+bptest(model_BN_bo_clean)
+```
+
 
 Testing the Normality Assumption
 ```{r, fig.width=8}
-srs <- studres(model_bo_vif)
+srs <- studres(model_BN_bo_clean)
 hist(srs, freq=FALSE, 
      main="Distribution of Studentized Residuals",
      breaks=100)
-xfit<-seq(min(srs),max(srs), length=40) 
-yfit<-dnorm(xfit) 
+xfit<-seq(min(srs),max(srs),length=100) 
+yfit<-dnorm(xfit)
 lines(xfit, yfit)
 ```
 
-
-```{r} 
-ks.test(studres(model_bo_vif), dnorm(xfit)) 
+```{r}
+ks.test(studres(model_BN_bo_clean), dnorm(xfit))
+ks.test(model_BN_bo_clean$residuals, y = train_clean$priceBN)
 ```
 
-```{r, fig.width=10}
-par(mfrow = c(2,2))
-plot(model_bo_vif)
+```{r}
+plot(model_BN_bo_clean)
 ```
+
+```{r}
+plot(model_BN_bo_clean$residuals, train_clean$priceBN)
+```
+
