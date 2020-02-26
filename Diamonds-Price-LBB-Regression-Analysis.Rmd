@@ -3,11 +3,35 @@ title: "Diamonds Price - LBB Regression Analysis"
 author: "Yevonnael Andrew"
 date: "2/18/2020"
 output: 
-  html_document:
-    keep_md: true
-  md_document:
-    variant: markdown_github
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: tango
+    df_print: paged
 ---
+
+# Introduction
+
+This analysis will try to create a regression analysis to predict the diamonds price given certain criteria of the diamonds. The dataset is downloaded from Kaggle: https://www.kaggle.com/shivam2503/diamonds
+
+This analysis is part of Algoritma LBB Project in Regression class.
+
+This project is consists of:
+
+1. Data Wrangling
+
+2. Exploratory Data Analysis
+
+3. Modeling
+- Outlier Analysis
+- Data Transformation (Box-Cox)
+- Feature Selection
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First, we will load the library needed for this analysis.
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -22,19 +46,38 @@ library(ggpubr)
 library(moderndive)
 library(olsrr)
 library(MASS)
+library(car)
+library(ggthemr)
 ```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ggthemr("flat")
+```
+
+Reading the dataset file.
 
 ```{r, message=FALSE, warning=FALSE}
 diamonds <- read_csv("diamonds.csv")
 ```
 
-X : Length of the Diamond in mm.
-Y : Width of the Diamond in mm.
-Z : Height of the Diamond in mm.
+price: price in US dollars (\$326--\$18,823)
+carat: weight of the diamond (0.2--5.01)
+cut: quality of the cut (Fair, Good, Very Good, Premium, Ideal)
+color: diamond colour, from J (worst) to D (best)
+clarity: a measurement of how clear the diamond is (I1 (worst), SI2, SI1, VS2, VS1, VVS2, VVS1, IF (best))
+x: length in mm (0--10.74)
+y: width in mm (0--58.9)
+z: depth in mm (0--31.8)
+depth: total depth percentage = z / mean(x, y) = 2 * z / (x + y) (43--79)
+table: width of top of diamond relative to widest point (43--95)
+
+Now we will get a glimpse over the data.
 
 ```{r}
 glimpse(diamonds)
 ```
+
+Now we will do some data transformation, converting some column type into the appropriate format. In this case, a column like Cut, Color, and Clarity are a factor, not a character.
 
 ```{r}
 diamonds$cut <- as.factor(diamonds$cut)
@@ -42,19 +85,29 @@ diamonds$color <- as.factor(diamonds$color)
 diamonds$clarity <- as.factor(diamonds$clarity)
 ```
 
+Personally, I like the `skim()` function from skimr package over `glimpse()` or `summary()` because it give a more detailed information about the data, including the missing rate, complete rate, number of unique, column type and for the numeric type. `skim()` also return the five-number summary with a cute little histogram.
+
 ```{r}
 skim(diamonds)
 ```
+
+From above info, we can see if there is a dataset that contain 0 in certain variable, let see how the datas look like.
 
 ```{r}
 diamonds[, c(1, 9:11)] %>%
   filter(x == 0 | y == 0 | z == 0)
 ```
 
+Now we remove it because it can make unnecessary noise in our analysis.
+
 ```{r}
 diamonds <- diamonds[,-1] %>%
   filter(x != 0 | y != 0 | z != 0)
 ```
+
+We will divide our dataset by 80% into train data and 20% into test data. We will using `set.seed()` function to make sure that R produce the same random number to make this report is reproducible.
+
+Our EDA will be only using train dataset, to avoid peeking at the test dataset.
 
 ```{r}
 smp_siz = floor(0.80*nrow(diamonds))
@@ -64,18 +117,26 @@ train = diamonds[train_ind,]
 test = diamonds[-train_ind,] 
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=12, cache=TRUE}
+Now we want to look at the correlation and distribution of the data, I will be using `ggpairs()` function to explore them. Also, to shorten time I only using 2000 rows of the data to look at. It is not a problem since it is only an exploratory.
+
+```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height = 12, cache=TRUE}
 ggpairs(train[4000:6000,])
 ```
+
+We will see the correlation of the numerical variables.
 
 ```{r}
 cor_mat <- cor(train[, -c(2:4)])
 cor_mat
 ```
 
+Looking at the correlation above is not really eye-pleasing, so we will create a correlation plot below.
+
 ```{r}
 corrplot(cor_mat, method="pie", type="lower", addCoef.col = "black")
 ```
+
+Now, we will looking in-depth how the criteria of the diamonds (numerical variables) affecting the price.
 
 ```{r, fig.width=10, fig.height=10}
 plot1 <- diamonds %>%
@@ -101,6 +162,8 @@ plot6 <- diamonds %>%
 
 ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 3, nrow = 3)
 ```
+
+Also, we want to looking in-depth how the criteria of the diamonds (categorical variables) affecting the price.
 
 ```{r, message=FALSE, waning=FALSE, fig.width=10, fig.height=10}
 plot1 <- train %>%
@@ -130,15 +193,34 @@ plot6 <- train %>%
 ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, ncol = 2, nrow = 3)
 ```
 
+By domain expertise, we are certain that price of the diamonds is affected by the carat. 
+
+Now let's try to create a single regression model that predict price by only using one feature: carat.
+
+# Modeling
+
 ```{r}
 model_single <- lm(price ~ carat, data = train)
 get_regression_summaries(model_single)
 ```
 
+R-squared  is a statistical measure that represents the proportion of the variance for a dependent variable that's explained by an independent variable or variables in a regression model. It means that by using carat only, we can explain 85% of diamonds price.
+
+Now let's try to throw all variables into the model.
+
 ```{r}
 model_full <- lm(price ~ ., data = train)
 get_regression_summaries(model_full)
 ```
+
+The full model have a higher R-squared: 92%, also lower RMSE. Good sign! But in statistics, if we have fewer variables that can explain as good as model that have more variables, it is more favorable.
+
+# Feature Selection
+
+Next, we will be doing a feature engineering by applying the `step()` function into our full model. We will be using:
+- backward option, which the function will iterate over the model, starts with all predictor (full model as we input it) and remove the least contributive predictors.
+- forward option, starts with the least predictor and add the most contributive predictors
+- both option, it works backward and forward, it combines two methods
 
 ```{r}
 model_bw <- step(model_full, direction = "backward", trace = FALSE)
@@ -162,25 +244,31 @@ get_regression_summaries(model_fw)
 get_regression_summaries(model_bo)
 ```
 
+Here we can see that all three methods produce the same formula, so we will assign the formula to `model_bo`.
+
+Now we will assess if multicollinearity is exist in our model by using **Variance Inflation Factor**. A general guideline is that a VIF  greater than 10 may indicate high collinearity and worth further inspection (Algoritma Lec. Notes).
+
 ```{r}
 car::vif(model_bo)
 ```
+
+We see that x value is almost 10. I decided just to remove it and recalculate the VIF.
 
 ```{r}
 model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table + z, data = train)
 car::vif(model_bo_vif)
 ```
 
-```{r}
-model_bo_vif <- lm(price ~ carat + cut + color + clarity + depth + table, data = train)
-car::vif(model_bo_vif)
-```
+Now our model's VIF value is all under five. I will use it for future modeling.
 
 ```{r}
 get_regression_summaries(model_bo_vif)
 ```
 
-Testing the Normality Assumption
+## Testing the Normality Assumption
+
+One of assumption in linear regression is that the residuals are normally distributed. Now we will plot the Studentized Residuals our model.
+
 ```{r, fig.width=8}
 srs <- studres(model_bo_vif)
 hist(srs, freq=FALSE, 
@@ -191,14 +279,36 @@ yfit<-dnorm(xfit)
 lines(xfit, yfit)
 ```
 
+It seems that our data is not normally distributed by
+looking at the graph. For make sure, we should calculate it statistically. Because our data is exceeding 5000, we must use Kolmogorov-Smirnov test.
+
 ```{r}
-ks.test(studres(model_bo_vif), dnorm(xfit))
+ks.test(studres(model_bo_vif), train$price)
 ```
+
+H0: The data follow a specified distribution
+HA: The data do not follow the specified distribution
+
+Because our p-value is <0.5, then the H0 is rejected, so our data **is not** normally distributed.
+
+**Heteroskedasticity Test**
+
+```{r}
+library(lmtest)
+bptest(model_bo_vif)
+```
+
+H0 : Residual Homoscedasticity
+HA : Residual Heteroscedasticity
+
+Because our p-value is <0.5, then the H0 is rejected, so our data error is heteroscedastic, it means our data is not too suitable to use this regression model.
 
 ```{r, fig.width=10}
 par(mfrow = c(2,2))
 plot(model_bo_vif)
 ```
+
+This is the visualization of our model's residuals. By looking at the Residuals vs Fitted, the point look like a fan, it mean the bigger the values, the more bigger the residuals. We should try to normalize them. Also, by looking at the Residuals vs Leverage, we can see some outlier points that we will do an outlier analysis.
 
 ## Normalization using bestNormalize()
 
@@ -208,6 +318,8 @@ https://cran.r-project.org/web/packages/bestNormalize/vignettes/bestNormalize.ht
 ```{r}
 library(bestNormalize)
 ```
+
+Before we normalize the variables, we will plot the variables distribution first.
 
 ```{r}
 par(mfrow=c(2, 4))
@@ -220,7 +332,15 @@ hist(train$y)
 hist(train$z)
 ```
 
-```{r}
+I will normalize them using `orderNorm()` function from bestNormalize package.
+
+For more info about `orderNorm()`, see this documentation: https://www.rdocumentation.org/packages/bestNormalize/versions/1.4.3/topics/orderNorm
+
+Quoted from above webpage, ***"The Ordered Quantile (ORQ) normalization transformation, `orderNorm()`, is a rank-based procedure by which the values of a vector are mapped to their percentile, which is then mapped to the same percentile of the normal distribution. Without the presence of ties, this essentially guarantees that the transformation leads to a uniform distribution."***
+
+We will create a new variable with suffix BN that indicate the normalized variables.
+
+```{r, message=FALSE, warning=FALSE}
 train$caratBN <- orderNorm(train$carat)$x.t
 train$depthBN <- orderNorm(train$depth)$x.t
 train$tableBN <- orderNorm(train$table)$x.t
@@ -229,6 +349,8 @@ train$xBN <- orderNorm(train$x)$x.t
 train$yBN <- orderNorm(train$y)$x.t
 train$zBN <- orderNorm(train$z)$x.t
 ```
+
+Now we will create a plot for the normalized variables.
 
 ```{r}
 par(mfrow=c(2, 4))
@@ -241,13 +363,14 @@ hist(train$yBN)
 hist(train$zBN)
 ```
 
+Now we will recreate a full model with all included variables that already normalized.
+
 ```{r}
 model_BN_full <- lm(priceBN ~ caratBN + depthBN + tableBN + xBN + yBN + zBN + cut + clarity + color, data = train)
 summary(model_BN_full)
 ```
 
------
-
+Now I am doing a feature selection by applying `step` function.
 
 ```{r}
 model_BN_none <- lm(priceBN ~ 1, data = train)
@@ -258,7 +381,14 @@ model_BN_bo <- step(model_BN_none, scope = list(lower = model_BN_none, upper = m
 summary(model_BN_bo)
 ```
 
-Testing the Normality Assumption
+```{r}
+car::vif(model_BN_bo)
+```
+
+## Testing the Normality Assumption
+
+Now we will plot the Studentized Residuals our model.
+
 ```{r, fig.width=8}
 srs <- studres(model_BN_bo)
 hist(srs, freq=FALSE, 
@@ -270,29 +400,52 @@ lines(xfit, yfit)
 ```
 
 ```{r}
+ks.test(studres(model_BN_bo), dnorm(xfit))
+```
+
+H0: The data follow a specified distribution
+HA: The data do not follow the specified distribution
+
+Because our p-value is <0.5, then the H0 is rejected, so our data **is not** normally distributed.
+
+*Heteroskedasticity Test**
+
+```{r}
 library(lmtest)
 bptest(model_BN_bo)
 ```
 
+H0 : Residual Homoscedasticity
+HA : Residual Heteroscedasticity
 
-```{r}
-ks.test(studres(model_BN_bo), dnorm(xfit))
+Because our p-value is <0.5, then the H0 is rejected, so our data error is heteroscedastic, it means our data is not too suitable to use this regression model.
+
+```{r, fig.width=10}
+par(mfrow = c(2,2))
+plot(model_BN_bo)
 ```
 
-```{r}
-hist(train$priceBN, breaks=1000)
-```
+**Conclusion: After normalization, we can see there is significant change in residuals normality in the graph. However, statistically it still not normality distributed.**
 
+Transformation is only used for exploring, not for predicition.
 
-## Outliers
+In the next step, we will try to handling the outlier. There are many ways to handling outlier. For this analysis, I will just remove it.
+
+## Outliers Handling Method: Cook's Distance
 
 ```{r}
 library(olsrr)
 ```
 
-```{r}
-cooksdplot <- ols_plot_cooksd_bar(model_BN_bo)
+I will analyze the outliers by calculating the Cook's distance. It is commonly used to estimate the influence of the data when doing a regression analysis. It is very useful to find influential outliers.
+
+I will draw the graph by using `ols_plot_cooksd_bar` function from olsrr package. I will save it into an object where we can extract the outliers data from the saved objects.
+
+```{r, fig.width=10}
+cooksdplot <- ols_plot_cooksd_bar(model_bo_vif)
 ```
+
+Now we will extract the outliers data.
 
 ```{r}
 data_cooksdplot <- cooksdplot$data
@@ -301,19 +454,20 @@ train_clean <- train[ind_outlier == FALSE,]
 train_outlier <- train[ind_outlier == TRUE,]
 ```
 
+After extracting the outliers data, we recreate a model without outliers.
+
 ```{r}
-model_BN_bo_clean <- lm(formula = priceBN ~ xBN + clarity + color + depthBN + zBN + 
-    yBN + cut + tableBN + caratBN, data = train_clean)
+model_bo_clean <- lm(price ~ carat + cut + color + clarity + depth + table + z, data = train_clean)
 ```
 
 ```{r}
-bptest(model_BN_bo_clean)
+get_regression_summaries(model_bo_clean)
 ```
 
+## Testing the Normality Assumption
 
-Testing the Normality Assumption
 ```{r, fig.width=8}
-srs <- studres(model_BN_bo_clean)
+srs <- studres(model_bo_clean)
 hist(srs, freq=FALSE, 
      main="Distribution of Studentized Residuals",
      breaks=100)
@@ -323,15 +477,84 @@ lines(xfit, yfit)
 ```
 
 ```{r}
-ks.test(studres(model_BN_bo_clean), dnorm(xfit))
-ks.test(model_BN_bo_clean$residuals, y = train_clean$priceBN)
+ks.test(model_bo_clean$residuals, y = train_clean$price)
+```
+
+H0: The data follow a specified distribution
+HA: The data do not follow the specified distribution
+
+Because our p-value is <0.5, then the H0 is rejected, so our data **is not** normally distributed.
+
+*Heteroskedasticity Test**
+
+```{r}
+bptest(model_bo_clean)
+```
+
+H0 : Residual Homoscedasticity
+HA : Residual Heteroscedasticity
+
+Because our p-value is <0.5, then the H0 is rejected, so our data error is heteroscedastic, it means our data is not too suitable to use this regression model.
+
+```{r, fig.width=10}
+par(mfrow = c(2,2))
+plot(model_bo_clean)
+```
+
+Visually, there is not much improvement by removing the outlier. In the next section, we will try to predict using all our built models. 
+
+# Prediction
+
+Create objects that contain predicted values.
+
+```{r}
+pred_single <- predict(model_single, test)
+pred_full <- predict(model_full, test)
+pred_bo_vif <- predict(model_bo_vif, test)
+pred_bo_clean <- predict(model_bo_clean, test)
+```
+
+Now we will computes the root mean squared error between each of predictions and the test data.
+
+```{r}
+library(MLmetrics)
+RMSE(pred_single, test$price)
 ```
 
 ```{r}
-plot(model_BN_bo_clean)
+RMSE(pred_full, test$price)
 ```
 
 ```{r}
-plot(model_BN_bo_clean$residuals, train_clean$priceBN)
+RMSE(pred_bo_vif, test$price)
 ```
 
+```{r}
+RMSE(pred_bo_clean, test$price)
+```
+
+# Conclusion
+
+Our model summary:
+
+1. Model with single predictor: Carat
+
+- RMSE: 1545.377
+- Adj. R-squared: 0.85
+
+2. Model with all predictors
+
+- RMSE: 1110.493
+- Adj. R-squared: 0.92
+
+3. Model with feature selection (from `step` using `both` method)
+
+- RMSE: 1181.229
+- Adj. R-squared: 0.92
+
+4. Model with removed outlier
+
+- RMSE: 1431.266
+- Adj. R-squared: 0.959
+
+By looking at the RMSE, we will choose either option 2 or 3 for our model.
